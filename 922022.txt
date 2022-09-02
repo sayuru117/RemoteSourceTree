@@ -1,0 +1,36 @@
+ public EODFileUploaderHelperBean loadEODOrderReconciliationEntries(DailyFileUploadRequest dailyFileUploadRequest, int primaryInsId) {
+        EODFileUploaderHelperBean eodFileUploaderHelperBean = new EODFileUploaderHelperBean();
+        Map<String, Integer> eodReconciliationStatusMap = new HashMap<>();
+        Queue<OrderReconciliationDataBean> eodReconciliationDataBeanQueue =  new LinkedList<>();
+        eodFileUploaderHelperBean.setEodReconciliationStatusMap(eodReconciliationStatusMap);
+        eodFileUploaderHelperBean.setEodReconciliationDataBeanQueue(eodReconciliationDataBeanQueue);
+        Connection connection = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        OrderReconciliationDataBean orderReconciliationDataBean = null;
+        String query;
+        logger.info("Inside.Start.OMSEodDao.loadEODOrderReconciliationEntries");
+        try {
+            connection = getDBConnection(dailyFileUploadRequest.getOmsMsgHeader().getTenantCode());
+            query = getEodOrderReconcilationEntriesQuery();
+            logger.info("Inside.Start.OMSEodDao.loadEODOrderReconciliationEntries.query " + query.toString() + " dailyFileUploadRequest.getFileUploadRequestBody().getBatchId() = " + dailyFileUploadRequest.getFileUploadRequestBody().getBatchId()
+            + " primaryInsId = " + primaryInsId);
+            ps = connection.prepareStatement(query);
+            ps.setInt(1, dailyFileUploadRequest.getFileUploadRequestBody().getBatchId());
+            ps.setInt(2, primaryInsId);
+            rs = ps.executeQuery();
+            logger.info("Inside.Executed.OMSEodDao.loadEODOrderReconciliationEntries");
+            while (rs.next()) {
+                orderReconciliationDataBean = getOrderReconciliationDataBean();
+                populateOrderReconciliationDataBean(rs, dailyFileUploadRequest,orderReconciliationDataBean);
+                eodReconciliationStatusMap.put(orderReconciliationDataBean.getId(), ApprovalStatus.PENDING.getStatusID());
+                eodReconciliationDataBeanQueue.add(orderReconciliationDataBean);
+            }
+        } catch (Exception ex) {
+            logger.error("LN:281", "Failure while retrieving EOD Entries From DB For primary institute id: " + primaryInsId + " Tenant Code " + dailyFileUploadRequest.getOmsMsgHeader().getTenantCode() , ex);
+            throw new OMSCoreDAOException(ErrorCodes.DAO_ERROR, ex);
+        } finally {
+            close(connection, ps, rs);
+        }
+        return eodFileUploaderHelperBean;
+    }
